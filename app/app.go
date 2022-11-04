@@ -231,6 +231,13 @@ var (
 	}
 )
 
+func IsCustomChannel(channelID string) (bool, int, CustomChannel) {
+	for index, customChannel := range AllCustomChannels {
+		return customChannel.DiscordChannel.ID == channelID, index, customChannel
+	}
+	return false, -1, CustomChannel{}
+}
+
 func CheckError(e error) {
 	if e != nil {
 		fmt.Println("Error with Discord API")
@@ -394,77 +401,74 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
-	// When a voice state is updated
-	// If a member leaves a channel, get the channel it leaved
-	if v.ChannelID == "" {
-		fmt.Println("🎫 OnLeaveChannel")
-		// Can we get the channel that the user disconnected from ?
-		previousChannelID := v.BeforeUpdate.ChannelID
-		for i, c := range AllCustomChannels {
-			if c.DiscordChannel.ID == previousChannelID {
-				c.NumberOfUsers--
-				// If this channel is now empty, remove it
-				if c.NumberOfUsers <= 0 {
-					AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
-					s.ChannelDelete(c.DiscordChannel.ID)
+	// Get player and verify it's not a bot
+	member, err := s.GuildMember(config.GuildID, v.UserID)
+	if err != nil {
+		fmt.Println("❌ Error getting user:", err)
+		return
+	}
+
+	if member.User.Bot {
+		return
+	}
+
+	// Get player action informations
+	from := ""
+	if v.BeforeUpdate != nil {
+		from = v.BeforeUpdate.ChannelID
+	}
+	to := v.ChannelID
+
+	// Player leaves a channel
+	if from != "" {
+		fmt.Println("🎫 OnChannelLeaved")
+		custom, i, c := IsCustomChannel(from)
+
+		if custom {
+			c.NumberOfUsers--
+			if c.NumberOfUsers <= 0 {
+				AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
+				s.ChannelDelete(from)
+			}
+		}
+		return
+	}
+
+	// Player joins a channel
+	if to != "" {
+		fmt.Println("🎫 OnChannelJoined")
+		custom, _, c := IsCustomChannel(to)
+
+		if custom {
+			c.NumberOfUsers++
+
+		} else {
+			if to == "1026145931298619543" {
+				// Create a new voice channel
+				nc, err := s.GuildChannelCreate(
+					config.GuildID,
+					fmt.Sprintf("🔰 Salon de %s", member.User.Username),
+					discordgo.ChannelTypeGuildVoice,
+				)
+				if err != nil {
+					fmt.Println("❌ Error creating a custom channel")
+					return
+				}
+
+				AllCustomChannels = append(AllCustomChannels, CustomChannel{
+					// Init numOfUsers to 0 because we move the member next
+					NumberOfUsers:  0,
+					DiscordChannel: nc,
+				})
+
+				// Move member to new channel
+				e := s.GuildMemberMove(config.GuildID, v.UserID, &nc.ID)
+				if e != nil {
+					fmt.Println("❌ Error moving member to it's custom channel")
 				}
 			}
 		}
 		return
-	}
-
-	fmt.Println("🎫 OnEnterChannel")
-	// If member connects to the "Add a channel" voice channel
-	if v.ChannelID == "1026145931298619543" {
-		// Get the member
-		m, err := s.GuildMember(config.GuildID, v.UserID)
-		if err != nil {
-			fmt.Println("❌ Error getting user:", err)
-			return
-		}
-		// Check if member is bot
-		if m.User.Bot {
-			return
-		}
-
-		// Create a new voice channel
-		c, err := s.GuildChannelCreate(
-			config.GuildID,
-			fmt.Sprintf("🔰 Salon de %s", m.User.Username),
-			discordgo.ChannelTypeGuildVoice,
-		)
-		if err != nil {
-			fmt.Println("❌ Error creating a custom channel")
-			return
-		}
-
-		AllCustomChannels = append(AllCustomChannels, CustomChannel{
-			NumberOfUsers:  0,
-			DiscordChannel: c,
-		})
-
-		// Move member to new channel
-		e := s.GuildMemberMove(config.GuildID, v.UserID, &c.ID)
-		if e != nil {
-			fmt.Println("❌ Error moving member to it's custom channel")
-		}
-	} else {
-		// If the member entered another channel, check if it is a custom one
-		for _, c := range AllCustomChannels {
-			if c.DiscordChannel.ID == v.ChannelID {
-				c.NumberOfUsers++
-				return
-			}
-		}
-		// It was another channel
-		return
-	}
-
-	// When a player enters a room add permission to discord user to see the channel
-	// Add permission
-	e := s.ChannelPermissionSet(v.ChannelID, v.UserID, discordgo.PermissionOverwriteTypeMember, discordgo.PermissionViewChannel+discordgo.PermissionVoiceConnect, 0)
-	if e != nil {
-		fmt.Println("Error adding permission:", e)
 	}
 }
 
