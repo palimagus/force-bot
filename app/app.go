@@ -7,14 +7,21 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/bwmarrin/discordgo"
 )
 
+type CustomChannel struct {
+	DiscordChannel *discordgo.Channel
+	NumberOfUsers  int
+}
+
 var (
-	ID             string
-	Session        *discordgo.Session
-	CustomChannels []*discordgo.Channel
+	ID                string
+	Session           *discordgo.Session
+	CustomChannels    []*discordgo.Channel
+	AllCustomChannels []CustomChannel
 
 	Commands = []*discordgo.ApplicationCommand{
 		{
@@ -259,11 +266,14 @@ func Start() {
 		registeredCommands[i] = cmd
 	}
 
+	// Initialize custom channels
+	AllCustomChannels = make([]CustomChannel, 0)
+
 	// Clean close
 	defer Session.Close()
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	// Await interrupt
 	fmt.Println("🤖 System is now running. Press CTRL+C to exit.")
@@ -271,7 +281,10 @@ func Start() {
 
 	// Save all to database
 	fmt.Println("🤖 Saving data.")
-	db.Save()
+	err := db.Save()
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// Then, unregister commands
 	fmt.Println("🤖 Unregistering commands.")
@@ -381,28 +394,35 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
-	// Voice state updated
+	// When a voice state is updated
+	// If a member leaves a channel, get the channel it leaved
 	if v.ChannelID == "" {
-		// Member left
-		for _, c := range CustomChannels {
-			if len(c.Members) <= 0 {
-				s.ChannelDelete(c.ID)
+		fmt.Println("🎫 OnLeaveChannel")
+		// Can we get the channel that the user disconnected from ?
+		previousChannelID := v.BeforeUpdate.ChannelID
+		for i, c := range AllCustomChannels {
+			if c.DiscordChannel.ID == previousChannelID {
+				c.NumberOfUsers--
+				// If this channel is now empty, remove it
+				if c.NumberOfUsers <= 0 {
+					AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
+					s.ChannelDelete(c.DiscordChannel.ID)
+				}
 			}
 		}
-
 		return
 	}
-	fmt.Println("🎫 OnEnterChannel")
 
+	fmt.Println("🎫 OnEnterChannel")
 	// If member connects to the "Add a channel" voice channel
 	if v.ChannelID == "1026145931298619543" {
-		// Récupérer le joueur
+		// Get the member
 		m, err := s.GuildMember(config.GuildID, v.UserID)
 		if err != nil {
 			fmt.Println("❌ Error getting user:", err)
 			return
 		}
-		// Check if user is bot
+		// Check if member is bot
 		if m.User.Bot {
 			return
 		}
@@ -418,13 +438,26 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 			return
 		}
 
-		CustomChannels = append(CustomChannels, c)
+		AllCustomChannels = append(AllCustomChannels, CustomChannel{
+			NumberOfUsers:  0,
+			DiscordChannel: c,
+		})
 
 		// Move member to new channel
 		e := s.GuildMemberMove(config.GuildID, v.UserID, &c.ID)
 		if e != nil {
 			fmt.Println("❌ Error moving member to it's custom channel")
 		}
+	} else {
+		// If the member entered another channel, check if it is a custom one
+		for _, c := range AllCustomChannels {
+			if c.DiscordChannel.ID == v.ChannelID {
+				c.NumberOfUsers++
+				return
+			}
+		}
+		// It was another channel
+		return
 	}
 
 	// When a player enters a room add permission to discord user to see the channel
