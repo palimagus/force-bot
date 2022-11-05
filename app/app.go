@@ -420,7 +420,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	to := v.ChannelID
 
 	// Player leaves a channel
-	if from != "" {
+	if from != "" && (from != to) {
 		fmt.Println("🎫 OnChannelLeaved")
 		custom, i, c := IsCustomChannel(from)
 
@@ -435,7 +435,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	}
 
 	// Player joins a channel
-	if to != "" {
+	if to != "" && (from != to) {
 		fmt.Println("🎫 OnChannelJoined")
 		custom, _, c := IsCustomChannel(to)
 
