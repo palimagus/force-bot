@@ -427,6 +427,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		if custom {
 			c.NumberOfUsers--
 			if c.NumberOfUsers <= 0 {
+				writeDebugToChannel(s, "🗑️ Channel supprimé: "+c.DiscordChannel.Name)
 				AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
 				s.ChannelDelete(from)
 			}
@@ -441,6 +442,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 		if custom {
 			c.NumberOfUsers++
+			writeDebugToChannel(s, fmt.Sprintf("👥 %d utilisateurs dans le salon %s", c.NumberOfUsers, c.DiscordChannel.Name))
 
 		} else {
 			if to == "1026145931298619543" {
@@ -476,4 +478,19 @@ func Notify(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredMessageUpdate,
 	})
+}
+
+func writeDebugToChannel(s *discordgo.Session, msg string) {
+	// Create a debug embed message
+	embed := &discordgo.MessageEmbed{
+		Title:       "Debug",
+		Description: msg,
+		Color:       0xff1e00,
+	}
+
+	// Send the message
+	_, e := s.ChannelMessageSendEmbed("803829358451359785", embed)
+	if e != nil {
+		fmt.Println("❌ Error sending debug message:", e)
+	}
 }
