@@ -438,6 +438,8 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Player joins a channel
 	if to != "" && (from != to) {
 		fmt.Println("🎫 OnChannelJoined")
+		writeDebugToChannel(s, fmt.Sprintf("🎫 OnChannelJoined: %s", to))
+		writeDebugToChannel(s, fmt.Sprintf("📜 Liste des channels: %v", AllCustomChannels))
 		custom, _, c := IsCustomChannel(to)
 
 		if custom {
@@ -462,6 +464,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 					NumberOfUsers:  0,
 					DiscordChannel: nc,
 				})
+				writeDebugToChannel(s, fmt.Sprintf("📜 Liste des channels: %v", AllCustomChannels))
 
 				// Move member to new channel
 				e := s.GuildMemberMove(config.GuildID, v.UserID, &nc.ID)
