@@ -6,6 +6,7 @@ import (
 	"forcebot/config"
 )
 
+// $env:GOOS='linux';  $env:GOARCH='amd64'; go build
 func main() {
 	fmt.Print("\033[H\033[2J")
 	fmt.Println("🤖 Booting system.")
