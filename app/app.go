@@ -426,8 +426,8 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 		if custom {
 			c.NumberOfUsers--
+			fmt.Printf("👥 %d utilisateurs dans le salon %s\n", c.NumberOfUsers, c.DiscordChannel.Name)
 			if c.NumberOfUsers <= 0 {
-				writeDebugToChannel(s, "🗑️ Channel supprimé: "+c.DiscordChannel.Name)
 				AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
 				s.ChannelDelete(from)
 			}
@@ -438,13 +438,11 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 	// Player joins a channel
 	if to != "" && (from != to) {
 		fmt.Println("🎫 OnChannelJoined")
-		writeDebugToChannel(s, fmt.Sprintf("🎫 OnChannelJoined: %s", to))
-		writeDebugToChannel(s, fmt.Sprintf("📜 Liste des channels: %v", AllCustomChannels))
 		custom, _, c := IsCustomChannel(to)
 
 		if custom {
 			c.NumberOfUsers++
-			writeDebugToChannel(s, fmt.Sprintf("👥 %d utilisateurs dans le salon %s", c.NumberOfUsers, c.DiscordChannel.Name))
+			fmt.Printf("👥 %d utilisateurs dans le salon %s\n", c.NumberOfUsers, c.DiscordChannel.Name)
 
 		} else {
 			if to == "1026145931298619543" {
@@ -461,7 +459,9 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 				AllCustomChannels = append(AllCustomChannels, CustomChannel{
 					// Init numOfUsers to 0 because we move the member next
-					NumberOfUsers:  0,
+					// FIX: the change is so fast that the event is not triggered
+					// init to 1
+					NumberOfUsers:  1,
 					DiscordChannel: nc,
 				})
 				writeDebugToChannel(s, fmt.Sprintf("📜 Liste des channels: %v", AllCustomChannels))
