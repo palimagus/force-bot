@@ -401,6 +401,13 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
+
+	// For each custom channel
+	for _, c := range AllCustomChannels {
+		// Print the channel name and the number of users in it
+		fmt.Printf("🎁 OnVoiceStateUpdate: %s (%d)\r", c.DiscordChannel.Name, c.NumberOfUsers)
+	}
+
 	// Get player and verify it's not a bot
 	member, err := s.GuildMember(config.GuildID, v.UserID)
 	if err != nil {
@@ -433,7 +440,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		custom, i, c := IsCustomChannel(from)
 
 		if custom {
-			c.NumberOfUsers--
+			c.NumberOfUsers = c.NumberOfUsers - 1
 			fmt.Printf("👥 %d utilisateurs dans le salon %s\n", c.NumberOfUsers, c.DiscordChannel.Name)
 			if c.NumberOfUsers <= 0 {
 				AllCustomChannels = append(AllCustomChannels[:i], AllCustomChannels[i+1:]...)
@@ -449,7 +456,7 @@ func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 		custom, _, c := IsCustomChannel(to)
 
 		if custom {
-			c.NumberOfUsers++
+			c.NumberOfUsers = c.NumberOfUsers + 1
 			fmt.Printf("👥 %d utilisateurs dans le salon %s\n", c.NumberOfUsers, c.DiscordChannel.Name)
 
 		} else {
