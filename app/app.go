@@ -403,9 +403,11 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 func OnVoiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
 
 	// For each custom channel
-	for _, c := range AllCustomChannels {
-		// Print the channel name and the number of users in it
-		fmt.Printf("🎁 OnVoiceStateUpdate: %s (%d)\r", c.DiscordChannel.Name, c.NumberOfUsers)
+	if len(AllCustomChannels) > 0 {
+		for _, ch := range AllCustomChannels {
+			// Print the channel name and the number of users in it
+			fmt.Printf("🎁 OnVoiceStateUpdate: %s (%d)\n", ch.DiscordChannel.Name, ch.NumberOfUsers)
+		}
 	}
 
 	// Get player and verify it's not a bot
